@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Home, MapPin, Calendar, Clock, Store, ShieldCheck, ShieldAlert, ShieldQuestion, CheckCircle2, XCircle, ArrowLeft, Info } from 'lucide-react';
 import { api } from '../../utils/api';
-import { formatDate, daysRemaining } from '../../utils/format';
+import { formatDate, daysRemaining, publicInspectionStatusText } from '../../utils/format';
 import TraceTimeline from '../../components/TraceTimeline';
-import type { BatchTraceDetail } from '../../../shared/types';
+import type { PublicBatchTraceDetail } from '../../../shared/types';
 
 const PRODUCT_EMOJI: Record<string, string> = {
   西红柿: '🍅',
@@ -33,7 +33,7 @@ const PRODUCT_EMOJI: Record<string, string> = {
 export default function ConsumerTrace() {
   const navigate = useNavigate();
   const { batchId } = useParams<{ batchId: string }>();
-  const [detail, setDetail] = useState<BatchTraceDetail | null>(null);
+  const [detail, setDetail] = useState<PublicBatchTraceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +46,7 @@ export default function ConsumerTrace() {
   async function fetchDetail() {
     setLoading(true);
     setError(null);
-    const res = await api.get<BatchTraceDetail>(`/batches/${batchId}`);
+    const res = await api.get<PublicBatchTraceDetail>(`/public/batches/${batchId}`);
     if (res.success && res.data) {
       setDetail(res.data);
     } else {
@@ -60,13 +60,15 @@ export default function ConsumerTrace() {
   }
 
   function getInspectionSummary() {
-    if (!detail || detail.inspections.length === 0) {
-      return { pass: 0, fail: 0, total: 0, latest: null };
+    if (!detail) {
+      return { pass: 0, fail: 0, total: 0 };
     }
-    const latest = detail.inspections[detail.inspections.length - 1];
-    const pass = latest.items.filter((i) => i.result === 'pass').length;
-    const fail = latest.items.filter((i) => i.result === 'fail').length;
-    return { pass, fail, total: latest.items.length, latest };
+    const { inspection } = detail;
+    return {
+      pass: inspection.passCount,
+      fail: inspection.failCount,
+      total: inspection.itemCount,
+    };
   }
 
   if (loading) {
@@ -126,7 +128,7 @@ export default function ConsumerTrace() {
     );
   }
 
-  const { batch, stall, inspections } = detail;
+  const { batch, stall, inspection } = detail;
   const remainDays = daysRemaining(batch.productionDate, batch.shelfLifeDays);
   const isNearExpiry = remainDays <= 3;
   const expiryDateStr = formatDate(
@@ -290,9 +292,9 @@ export default function ConsumerTrace() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">检测报告</span>
+                  <span className="text-xs text-gray-400">检测结论</span>
                   <span className="text-sm font-semibold text-gray-700">
-                    {inspections.length > 0 ? `${inspections.length} 份` : '暂无'}
+                    {publicInspectionStatusText[inspection.overall]}
                   </span>
                 </div>
                 {inspectionSummary.total > 0 && (

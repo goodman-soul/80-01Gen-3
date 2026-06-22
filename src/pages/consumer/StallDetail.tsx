@@ -56,7 +56,7 @@ export default function ConsumerStallDetail() {
     if (stallRes.success && stallRes.data) {
       setStall(stallRes.data);
     }
-    const batchRes = await api.get<ProductBatch[]>(`/batches?stallId=${stallId}`);
+    const batchRes = await api.get<ProductBatch[]>(`/public/batches?stallId=${stallId}`);
     if (batchRes.success && batchRes.data) {
       setBatches(batchRes.data);
     }

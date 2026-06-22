@@ -1,9 +1,9 @@
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
-import type { TraceRecord } from '../../shared/types';
+import type { TraceRecord, PublicTraceRecord } from '../../shared/types';
 import { formatDateTime } from '../utils/format';
 
 interface Props {
-  records: TraceRecord[];
+  records: TraceRecord[] | PublicTraceRecord[];
   variant?: 'full' | 'consumer';
 }
 
@@ -60,7 +60,7 @@ export default function TraceTimeline({ records, variant = 'full' }: Props) {
                     <p className="text-xs font-semibold text-gray-500">
                       {formatDateTime(record.timestamp)}
                     </p>
-                    {variant === 'full' && (
+                    {variant === 'full' && 'operator' in record && (
                       <p className="text-xs text-primary-600 font-medium mt-1">
                         {record.operator}
                       </p>

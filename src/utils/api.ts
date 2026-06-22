@@ -2,6 +2,8 @@ import type { ApiResponse } from '../../shared/types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE || '/api';
 
+let authToken: string | null = null;
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -10,6 +12,10 @@ async function request<T>(
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string> || {}),
   };
+
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  }
 
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
@@ -46,4 +52,10 @@ export const api = {
       body: body ? JSON.stringify(body) : undefined,
     }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  setAuthToken: (token: string) => {
+    authToken = token;
+  },
+  clearAuthToken: () => {
+    authToken = null;
+  },
 };

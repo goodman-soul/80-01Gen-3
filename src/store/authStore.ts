@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { UserRole, LoginResponse } from '../../shared/types';
+import { api } from '../utils/api';
 
 interface AuthState {
   token: string | null;
@@ -15,8 +16,14 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       token: null,
       user: null,
-      login: (data: LoginResponse) => set({ token: data.token, user: data.user }),
-      logout: () => set({ token: null, user: null }),
+      login: (data: LoginResponse) => {
+        api.setAuthToken(data.token);
+        set({ token: data.token, user: data.user });
+      },
+      logout: () => {
+        api.clearAuthToken();
+        set({ token: null, user: null });
+      },
       isAuthenticated: (role?: UserRole) => {
         const { token, user } = get();
         if (!token || !user) return false;
@@ -24,6 +31,13 @@ export const useAuthStore = create<AuthState>()(
         return true;
       },
     }),
-    { name: 'trace-auth-storage' }
+    {
+      name: 'trace-auth-storage',
+      onRehydrateStorage: () => (state) => {
+        if (state?.token) {
+          api.setAuthToken(state.token);
+        }
+      },
+    }
   )
 );

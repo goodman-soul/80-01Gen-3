@@ -31,3 +31,8 @@ dist-ssr
 coverage/
 *.tsbuildinfo
 .trae/
+
+# Runtime persistence data
+data/trace-data.json
+data/trace-data-backup.json
+api/data/db.json

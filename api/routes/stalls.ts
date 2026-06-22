@@ -1,11 +1,13 @@
 import { Router } from 'express';
-import { stalls, productBatches } from '../data/store.js';
+import { getStalls, getProductBatches } from '../data/persistentStore.js';
 import { maskVendorName } from '../services/traceService.js';
+import { anyAuth } from '../middleware/auth.js';
 import type { ApiResponse, Stall, StallWithMask, ProductBatch } from '../../shared/types';
 
 const router = Router();
 
 router.get('/', (_req, res) => {
+  const stalls = getStalls();
   const maskedStalls: StallWithMask[] = stalls.map(s => ({
     id: s.id,
     stallNo: s.stallNo,
@@ -28,7 +30,7 @@ router.get('/', (_req, res) => {
 
 router.get('/:id', (req, res) => {
   const { id } = req.params;
-  const stall = stalls.find(s => s.id === id);
+  const stall = getStalls().find(s => s.id === id);
 
   if (!stall) {
     const response: ApiResponse<null> = {
@@ -58,19 +60,19 @@ router.get('/:id', (req, res) => {
   res.json(response);
 });
 
-router.get('/:id/detail', (req, res) => {
+router.get('/:id/detail', anyAuth, (req, res) => {
   const { id } = req.params;
-  const stall = stalls.find(s => s.id === id);
+  const stall = getStalls().find(s => s.id === id);
 
   if (!stall) {
-    const response: ApiResponse<null> = {
-      success: false,
-      message: '摊位不存在',
-    };
-    return res.status(404).json(response);
+    return res.status(404).json({ success: false, message: '摊位不存在' });
   }
 
-  const batches = productBatches.filter(b => b.stallId === id);
+  if (req.auth?.role === 'vendor' && req.auth.stallId !== id) {
+    return res.status(403).json({ success: false, message: '无权访问其他摊位的详细数据' });
+  }
+
+  const batches: ProductBatch[] = getProductBatches().filter(b => b.stallId === id);
 
   const response: ApiResponse<{ stall: Stall; batches: ProductBatch[] }> = {
     success: true,

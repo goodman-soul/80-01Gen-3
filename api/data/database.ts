@@ -1,0 +1,435 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type {
+  Stall,
+  ProductBatch,
+  InspectionReport,
+  PatrolRecord,
+  VendorUser,
+  AdminUser,
+  InspectionItem,
+} from '../../shared/types';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_FILE = path.join(DATA_DIR, 'db.json');
+
+interface DatabaseSchema {
+  vendorUsers: VendorUser[];
+  adminUsers: AdminUser[];
+  stalls: Stall[];
+  productBatches: ProductBatch[];
+  inspectionReports: InspectionReport[];
+  patrolRecords: PatrolRecord[];
+  tokens: { token: string; userId: string; role: string; createdAt: string }[];
+}
+
+const today = new Date();
+const formatDate = (d: Date) => d.toISOString().split('T')[0];
+const formatDateTime = (d: Date) => d.toISOString();
+const daysAgo = (n: number) => {
+  const d = new Date(today);
+  d.setDate(d.getDate() - n);
+  return d;
+};
+
+const defaultInspectionItems: InspectionItem[] = [
+  { name: '农药残留', result: 'pass', value: '未检出' },
+  { name: '重金属', result: 'pass', value: '0.01mg/kg' },
+  { name: '微生物指标', result: 'pass', value: '合格' },
+  { name: '感官检查', result: 'pass', value: '色泽正常，无异味' },
+];
+
+function createSeedData(): DatabaseSchema {
+  return {
+    vendorUsers: [
+      {
+        id: 'v1',
+        username: 'vendor01',
+        password: '123456',
+        stallId: 's1',
+        name: '王建国',
+      },
+    ],
+    adminUsers: [
+      {
+        id: 'a1',
+        username: 'admin01',
+        password: 'admin123',
+        name: '李管理',
+      },
+    ],
+    stalls: [
+      {
+        id: 's1',
+        stallNo: 'A-018',
+        name: '老王精品蔬菜摊',
+        category: '蔬菜',
+        vendorName: '王建国',
+        vendorPhone: '13812345678',
+        location: 'A区 蔬菜区 第18号',
+        creditRating: 'A',
+        createdAt: formatDateTime(daysAgo(180)),
+      },
+      {
+        id: 's2',
+        stallNo: 'B-006',
+        name: '阿芳鲜果屋',
+        category: '水果',
+        vendorName: '陈芳',
+        vendorPhone: '13987654321',
+        location: 'B区 水果区 第6号',
+        creditRating: 'A',
+        createdAt: formatDateTime(daysAgo(120)),
+      },
+      {
+        id: 's3',
+        stallNo: 'C-012',
+        name: '张家鲜肉铺',
+        category: '肉类',
+        vendorName: '张志强',
+        vendorPhone: '13655558888',
+        location: 'C区 肉类区 第12号',
+        creditRating: 'B',
+        createdAt: formatDateTime(daysAgo(200)),
+      },
+      {
+        id: 's4',
+        stallNo: 'D-003',
+        name: '海之味水产',
+        category: '水产',
+        vendorName: '刘海涛',
+        vendorPhone: '13777776666',
+        location: 'D区 水产区 第3号',
+        creditRating: 'A',
+        createdAt: formatDateTime(daysAgo(90)),
+      },
+      {
+        id: 's5',
+        stallNo: 'E-025',
+        name: '山珍干货行',
+        category: '干货',
+        vendorName: '赵美玲',
+        vendorPhone: '13599992222',
+        location: 'E区 干货区 第25号',
+        creditRating: 'B',
+        createdAt: formatDateTime(daysAgo(250)),
+      },
+    ],
+    productBatches: [
+      {
+        id: 'b1',
+        batchNo: 'SC20260620001',
+        stallId: 's1',
+        productName: '有机西红柿',
+        origin: '山东省寿光市洛城街道',
+        supplier: '寿光绿源蔬菜专业合作社',
+        quantity: 200,
+        unit: 'kg',
+        productionDate: formatDate(daysAgo(2)),
+        shelfLifeDays: 10,
+        purchaseDate: formatDate(today),
+        traceCode: 'TRACE-SC-20260620-8821',
+        inspectionStatus: 'passed',
+        remainingStock: 135,
+        isNearExpiry: false,
+      },
+      {
+        id: 'b2',
+        batchNo: 'SC20260620002',
+        stallId: 's1',
+        productName: '青翠小白菜',
+        origin: '江苏省南通市海门区',
+        supplier: '南通鲜叶蔬菜基地',
+        quantity: 150,
+        unit: 'kg',
+        productionDate: formatDate(daysAgo(1)),
+        shelfLifeDays: 5,
+        purchaseDate: formatDate(today),
+        traceCode: 'TRACE-SC-20260620-6643',
+        inspectionStatus: 'passed',
+        remainingStock: 88,
+        isNearExpiry: false,
+      },
+      {
+        id: 'b3',
+        batchNo: 'SC20260618005',
+        stallId: 's1',
+        productName: '紫皮茄子',
+        origin: '安徽省合肥市肥西县',
+        supplier: '肥西江淮蔬菜种植场',
+        quantity: 120,
+        unit: 'kg',
+        productionDate: formatDate(daysAgo(5)),
+        shelfLifeDays: 7,
+        purchaseDate: formatDate(daysAgo(2)),
+        traceCode: 'TRACE-SC-20260618-1127',
+        inspectionStatus: 'pending',
+        remainingStock: 42,
+        isNearExpiry: true,
+      },
+      {
+        id: 'b4',
+        batchNo: 'FR20260620001',
+        stallId: 's2',
+        productName: '阳光玫瑰葡萄',
+        origin: '云南省大理州宾川县',
+        supplier: '宾川云品水果种植有限公司',
+        quantity: 100,
+        unit: 'kg',
+        productionDate: formatDate(daysAgo(3)),
+        shelfLifeDays: 14,
+        purchaseDate: formatDate(today),
+        traceCode: 'TRACE-FR-20260620-3345',
+        inspectionStatus: 'passed',
+        remainingStock: 72,
+        isNearExpiry: false,
+      },
+      {
+        id: 'b5',
+        batchNo: 'FR20260619003',
+        stallId: 's2',
+        productName: '烟台红富士苹果',
+        origin: '山东省烟台市栖霞市',
+        supplier: '栖霞果香源果品合作社',
+        quantity: 300,
+        unit: 'kg',
+        productionDate: formatDate(daysAgo(20)),
+        shelfLifeDays: 90,
+        purchaseDate: formatDate(daysAgo(1)),
+        traceCode: 'TRACE-FR-20260619-9912',
+        inspectionStatus: 'passed',
+        remainingStock: 256,
+        isNearExpiry: false,
+      },
+      {
+        id: 'b6',
+        batchNo: 'MT20260620001',
+        stallId: 's3',
+        productName: '土猪后腿肉',
+        origin: '湖南省湘西州凤凰县',
+        supplier: '凤凰黑猪养殖基地',
+        quantity: 80,
+        unit: 'kg',
+        productionDate: formatDate(today),
+        shelfLifeDays: 3,
+        purchaseDate: formatDate(today),
+        traceCode: 'TRACE-MT-20260620-7788',
+        inspectionStatus: 'passed',
+        remainingStock: 52,
+        isNearExpiry: true,
+      },
+      {
+        id: 'b7',
+        batchNo: 'AQ20260620002',
+        stallId: 's4',
+        productName: '鲜活大闸蟹',
+        origin: '江苏省苏州市阳澄湖',
+        supplier: '阳澄湖蟹农联合社',
+        quantity: 200,
+        unit: '只',
+        productionDate: formatDate(today),
+        shelfLifeDays: 2,
+        purchaseDate: formatDate(today),
+        traceCode: 'TRACE-AQ-20260620-2234',
+        inspectionStatus: 'pending',
+        remainingStock: 186,
+        isNearExpiry: true,
+      },
+      {
+        id: 'b8',
+        batchNo: 'GH20260615001',
+        stallId: 's5',
+        productName: '东北黑木耳',
+        origin: '黑龙江省牡丹江市海林市',
+        supplier: '海林雪乡食用菌专业合作社',
+        quantity: 50,
+        unit: 'kg',
+        productionDate: formatDate(daysAgo(30)),
+        shelfLifeDays: 365,
+        purchaseDate: formatDate(daysAgo(5)),
+        traceCode: 'TRACE-GH-20260615-5566',
+        inspectionStatus: 'passed',
+        remainingStock: 48,
+        isNearExpiry: false,
+      },
+    ],
+    inspectionReports: [
+      {
+        id: 'i1',
+        batchId: 'b1',
+        inspector: '市场快检室-周检测员',
+        inspectionDate: formatDate(today),
+        items: [...defaultInspectionItems],
+        overall: 'pass',
+        remarks: '各项指标合格，准于上架销售',
+      },
+      {
+        id: 'i2',
+        batchId: 'b2',
+        inspector: '市场快检室-周检测员',
+        inspectionDate: formatDate(today),
+        items: [
+          { name: '农药残留', result: 'pass', value: '未检出' },
+          { name: '重金属', result: 'pass', value: '0.008mg/kg' },
+          { name: '水分含量', result: 'pass', value: '92.3%' },
+          { name: '感官检查', result: 'pass', value: '叶片新鲜，无枯黄' },
+        ],
+        overall: 'pass',
+      },
+      {
+        id: 'i3',
+        batchId: 'b4',
+        inspector: '第三方检测-陈工',
+        inspectionDate: formatDate(daysAgo(1)),
+        items: [
+          { name: '农药残留', result: 'pass', value: '未检出' },
+          { name: '甜蜜素', result: 'pass', value: '未检出' },
+          { name: '糖度', result: 'pass', value: '18.2°Bx' },
+          { name: '感官检查', result: 'pass', value: '果粒饱满，果粉完整' },
+        ],
+        overall: 'pass',
+        remarks: '糖度达标，品质优良',
+      },
+      {
+        id: 'i4',
+        batchId: 'b5',
+        inspector: '市场快检室-吴检测员',
+        inspectionDate: formatDate(daysAgo(1)),
+        items: [...defaultInspectionItems],
+        overall: 'pass',
+      },
+      {
+        id: 'i5',
+        batchId: 'b6',
+        inspector: '动物卫生监督-刘检疫员',
+        inspectionDate: formatDate(today),
+        items: [
+          { name: '检疫证明', result: 'pass', value: '证号：JYZ20260620001' },
+          { name: '瘦肉精', result: 'pass', value: '未检出' },
+          { name: '感官检查', result: 'pass', value: '肉色鲜红，有弹性' },
+          { name: '印章核验', result: 'pass', value: '验讫印章齐全' },
+        ],
+        overall: 'pass',
+        remarks: '已通过动物检疫，附检验合格证',
+      },
+      {
+        id: 'i6',
+        batchId: 'b8',
+        inspector: '第三方检测-林工',
+        inspectionDate: formatDate(daysAgo(4)),
+        items: [
+          { name: '二氧化硫', result: 'pass', value: '未检出' },
+          { name: '重金属(铅)', result: 'pass', value: '0.05mg/kg' },
+          { name: '水分', result: 'pass', value: '12.1%' },
+          { name: '感官检查', result: 'pass', value: '耳瓣整齐，色泽乌黑' },
+        ],
+        overall: 'pass',
+      },
+    ],
+    patrolRecords: [
+      {
+        id: 'p1',
+        adminId: 'a1',
+        adminName: '李管理',
+        batchId: 'b1',
+        stallId: 's1',
+        patrolTime: formatDateTime(daysAgo(0)).replace('T00:00:00', 'T09:15:00'),
+        findings: '摊位摆放整齐，溯源码张贴醒目，批次信息完整',
+        status: 'normal',
+      },
+      {
+        id: 'p2',
+        adminId: 'a1',
+        adminName: '李管理',
+        batchId: 'b6',
+        stallId: 's3',
+        patrolTime: formatDateTime(daysAgo(0)).replace('T00:00:00', 'T10:30:00'),
+        findings: '冷藏温度达标 4℃，检疫证明公示到位',
+        status: 'normal',
+      },
+      {
+        id: 'p3',
+        adminId: 'a1',
+        adminName: '李管理',
+        batchId: 'b3',
+        stallId: 's1',
+        patrolTime: formatDateTime(daysAgo(0)).replace('T00:00:00', 'T14:20:00'),
+        findings: '该批茄子临近保质期（剩余2天），库存仍有42kg',
+        actions: '已督促摊主打折促销，明日14:00前复查',
+        status: 'warning',
+      },
+    ],
+    tokens: [],
+  };
+}
+
+let dbCache: DatabaseSchema | null = null;
+let fileWatcher: fs.FSWatcher | null = null;
+
+function ensureDataDir(): void {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+}
+
+function initializeDatabase(): void {
+  ensureDataDir();
+
+  if (!fs.existsSync(DATA_FILE)) {
+    const seed = createSeedData();
+    fs.writeFileSync(DATA_FILE, JSON.stringify(seed, null, 2), 'utf-8');
+    console.log(`[DB] 初始化种子数据成功: ${DATA_FILE}`);
+  }
+
+  try {
+    const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+    dbCache = JSON.parse(raw) as DatabaseSchema;
+    if (!dbCache.tokens) dbCache.tokens = [];
+  } catch (e) {
+    console.error('[DB] 数据文件损坏，重新初始化:', e);
+    const seed = createSeedData();
+    fs.writeFileSync(DATA_FILE, JSON.stringify(seed, null, 2), 'utf-8');
+    dbCache = seed;
+  }
+
+  if (!fileWatcher) {
+    fileWatcher = fs.watch(DATA_FILE, () => {
+      try {
+        const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+        dbCache = JSON.parse(raw) as DatabaseSchema;
+        if (!dbCache.tokens) dbCache.tokens = [];
+      } catch {
+        // 文件写入期间可能短暂读取失败，忽略
+      }
+    });
+  }
+}
+
+function persist(): void {
+  if (!dbCache) return;
+  ensureDataDir();
+  const tmp = DATA_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(dbCache, null, 2), 'utf-8');
+  fs.renameSync(tmp, DATA_FILE);
+}
+
+export function getDB(): DatabaseSchema {
+  if (!dbCache) initializeDatabase();
+  return dbCache!;
+}
+
+export function saveDB(): void {
+  persist();
+}
+
+export function resetDB(): void {
+  const seed = createSeedData();
+  dbCache = seed;
+  persist();
+  console.log('[DB] 数据已重置为种子数据');
+}
+
+initializeDatabase();

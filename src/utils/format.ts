@@ -43,3 +43,9 @@ export const ratingText: Record<string, { text: string; className: string }> = {
   B: { text: '信用良好 B', className: 'bg-gradient-to-r from-accent-500 to-amber-400 text-white' },
   C: { text: '信用一般 C', className: 'bg-gradient-to-r from-gray-500 to-gray-400 text-white' },
 };
+
+export const publicInspectionStatusText: Record<string, string> = {
+  pass: '检测合格',
+  fail: '检测不合格',
+  pending: '等待检测',
+};

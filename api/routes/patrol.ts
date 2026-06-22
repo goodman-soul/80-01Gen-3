@@ -1,13 +1,18 @@
 import { Router } from 'express';
-import { patrolRecords } from '../data/store.js';
+import {
+  getPatrolRecords,
+  addPatrolRecord,
+  getProductBatches,
+} from '../data/persistentStore.js';
 import { genId } from '../services/traceService.js';
-import type { ApiResponse, PatrolRecord, CreatePatrolDto } from '../../shared/types';
+import { adminAuth } from '../middleware/auth.js';
+import type { ApiResponse, PatrolRecord } from '../../shared/types';
 
 const router = Router();
 
-router.get('/records', (req, res) => {
+router.get('/records', adminAuth, (req, res) => {
   const { batchId, stallId, status } = req.query;
-  let result = [...patrolRecords];
+  let result = [...getPatrolRecords()];
 
   if (batchId) {
     result = result.filter(p => p.batchId === String(batchId));
@@ -31,13 +36,34 @@ router.get('/records', (req, res) => {
   res.json(response);
 });
 
-router.post('/records', (req, res) => {
-  const body = req.body as CreatePatrolDto;
+router.post('/records', adminAuth, (req, res) => {
+  const body = req.body as {
+    batchId: string;
+    stallId: string;
+    findings: string;
+    actions?: string;
+    status: 'normal' | 'warning' | 'rectified';
+  };
+
+  if (!body.batchId || !body.stallId || !body.findings || !body.status) {
+    return res.status(400).json({
+      success: false,
+      message: '批次ID、摊位ID、巡检内容和状态为必填项',
+    });
+  }
+
+  const batch = getProductBatches().find(b => b.id === body.batchId);
+  if (!batch) {
+    return res.status(400).json({ success: false, message: '关联批次不存在' });
+  }
+
+  const adminId = req.auth.userId;
+  const adminName = req.auth.name;
 
   const newRecord: PatrolRecord = {
     id: genId('p'),
-    adminId: body.adminId,
-    adminName: body.adminName,
+    adminId,
+    adminName,
     batchId: body.batchId,
     stallId: body.stallId,
     patrolTime: new Date().toISOString(),
@@ -46,7 +72,7 @@ router.post('/records', (req, res) => {
     status: body.status,
   };
 
-  patrolRecords.unshift(newRecord);
+  addPatrolRecord(newRecord);
 
   const response: ApiResponse<PatrolRecord> = {
     success: true,
@@ -56,7 +82,8 @@ router.post('/records', (req, res) => {
   res.status(201).json(response);
 });
 
-router.get('/stats', (_req, res) => {
+router.get('/stats', adminAuth, (_req, res) => {
+  const patrolRecords = getPatrolRecords();
   const today = new Date().toISOString().split('T')[0];
   const todayRecords = patrolRecords.filter(p => p.patrolTime.startsWith(today));
   const warningCount = patrolRecords.filter(p => p.status === 'warning').length;

@@ -154,3 +154,50 @@ export interface DashboardStats {
   inspectionPassRate: number;
   recentBatches: ProductBatch[];
 }
+
+export interface PublicTraceRecord {
+  timestamp: string;
+  action: string;
+  description: string;
+  icon?: string;
+}
+
+export interface PublicInspectionSummary {
+  overall: 'pass' | 'fail' | 'pending';
+  passCount: number;
+  failCount: number;
+  itemCount: number;
+}
+
+export interface PublicBatchTraceDetail {
+  batch: {
+    id: string;
+    batchNo: string;
+    productName: string;
+    origin: string;
+    unit: string;
+    productionDate: string;
+    shelfLifeDays: number;
+    purchaseDate: string;
+    traceCode: string;
+    inspectionStatus: InspectionStatus;
+    isNearExpiry: boolean;
+  };
+  stall: {
+    id: string;
+    stallNo: string;
+    name: string;
+    category: string;
+    location: string;
+    creditRating: CreditRating;
+  };
+  inspection: PublicInspectionSummary;
+  traceChain: PublicTraceRecord[];
+}
+
+export interface AuthenticatedResponse<T> {
+  success: boolean;
+  message: string;
+  data?: T;
+  requiresAuth?: boolean;
+}

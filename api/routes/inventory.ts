@@ -1,16 +1,21 @@
 import { Router } from 'express';
-import { productBatches } from '../data/store.js';
+import {
+  getProductBatches,
+  deductBatchStock,
+  setBatchStock,
+} from '../data/persistentStore.js';
 import { isNearExpiry } from '../services/traceService.js';
+import { vendorAuth } from '../middleware/auth.js';
 import type { ApiResponse, ProductBatch, DeductInventoryDto } from '../../shared/types';
 
 const router = Router();
 
-router.get('/', (req, res) => {
-  const { stallId } = req.query;
-  let result = [...productBatches];
+router.get('/', vendorAuth, (req, res) => {
+  const stallId = req.auth?.stallId;
+  let result = [...getProductBatches()];
 
   if (stallId) {
-    result = result.filter(b => b.stallId === String(stallId));
+    result = result.filter(b => b.stallId === stallId);
   }
 
   result = result.map(b => ({ ...b, isNearExpiry: isNearExpiry(b) }));
@@ -27,11 +32,11 @@ router.get('/', (req, res) => {
   res.json(response);
 });
 
-router.post('/:id/deduct', (req, res) => {
+router.post('/:id/deduct', vendorAuth, (req, res) => {
   const { id } = req.params;
   const { amount } = req.body as DeductInventoryDto;
 
-  const batch = productBatches.find(b => b.id === id);
+  const batch = getProductBatches().find(b => b.id === id);
 
   if (!batch) {
     const response: ApiResponse<null> = {
@@ -39,6 +44,10 @@ router.post('/:id/deduct', (req, res) => {
       message: '批次不存在',
     };
     return res.status(404).json(response);
+  }
+
+  if (req.auth?.stallId !== batch.stallId) {
+    return res.status(403).json({ success: false, message: '无权操作其他摊位的库存' });
   }
 
   if (amount <= 0) {
@@ -57,21 +66,21 @@ router.post('/:id/deduct', (req, res) => {
     return res.status(400).json(response);
   }
 
-  batch.remainingStock -= amount;
+  const updatedBatch = deductBatchStock(id, amount);
 
   const response: ApiResponse<ProductBatch> = {
     success: true,
-    message: `库存扣减成功，剩余 ${batch.remainingStock}${batch.unit}`,
-    data: { ...batch, isNearExpiry: isNearExpiry(batch) },
+    message: `库存扣减成功，剩余 ${updatedBatch?.remainingStock}${batch.unit}`,
+    data: updatedBatch ? { ...updatedBatch, isNearExpiry: isNearExpiry(updatedBatch) } : undefined,
   };
   res.json(response);
 });
 
-router.post('/:id/set', (req, res) => {
+router.post('/:id/set', vendorAuth, (req, res) => {
   const { id } = req.params;
   const { remainingStock } = req.body as { remainingStock: number };
 
-  const batch = productBatches.find(b => b.id === id);
+  const batch = getProductBatches().find(b => b.id === id);
 
   if (!batch) {
     const response: ApiResponse<null> = {
@@ -79,6 +88,10 @@ router.post('/:id/set', (req, res) => {
       message: '批次不存在',
     };
     return res.status(404).json(response);
+  }
+
+  if (req.auth?.stallId !== batch.stallId) {
+    return res.status(403).json({ success: false, message: '无权操作其他摊位的库存' });
   }
 
   if (remainingStock < 0) {
@@ -89,12 +102,12 @@ router.post('/:id/set', (req, res) => {
     return res.status(400).json(response);
   }
 
-  batch.remainingStock = remainingStock;
+  const updatedBatch = setBatchStock(id, remainingStock);
 
   const response: ApiResponse<ProductBatch> = {
     success: true,
     message: '库存更新成功',
-    data: { ...batch, isNearExpiry: isNearExpiry(batch) },
+    data: updatedBatch ? { ...updatedBatch, isNearExpiry: isNearExpiry(updatedBatch) } : undefined,
   };
   res.json(response);
 });
